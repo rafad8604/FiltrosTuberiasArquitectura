@@ -23,6 +23,12 @@ public class PaqueteDatos {
     private final List<byte[]> lista;    // múltiples elementos
     private final List<String> nombres;  // nombres de archivo opcionales
 
+    /**
+     * Parámetros adicionales opcionales (p.ej. palabra a buscar para ID7/ID8).
+     * Campo mutable para no romper los constructores existentes.
+     */
+    private String parametros = "";
+
     // ── Constructores ─────────────────────────────────────────────
 
     /** Crea un paquete con un único elemento. */
@@ -51,11 +57,17 @@ public class PaqueteDatos {
 
     // ── Getters ───────────────────────────────────────────────────
 
-    public TipoDato     getTipo()    { return tipo; }
-    public byte[]       getDatos()   { return datos; }
-    public List<byte[]> getLista()   { return lista; }
-    public List<String> getNombres() { return nombres; }
-    public boolean      esLista()    { return lista != null; }
+    public TipoDato     getTipo()       { return tipo; }
+    public byte[]       getDatos()      { return datos; }
+    public List<byte[]> getLista()      { return lista; }
+    public List<String> getNombres()    { return nombres; }
+    public boolean      esLista()       { return lista != null; }
+
+    /** Devuelve los parámetros adicionales (nunca null, puede ser vacío). */
+    public String       getParametros() { return parametros; }
+
+    /** Establece parámetros adicionales (p.ej. palabra de búsqueda). */
+    public void setParametros(String p) { this.parametros = (p != null ? p : ""); }
 
     // ── Conversiones automáticas ──────────────────────────────────
 
