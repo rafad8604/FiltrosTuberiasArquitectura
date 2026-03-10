@@ -427,8 +427,15 @@ public class VistaEscritorio extends JFrame {
 
         lblFiltroTitulo.setText("ID" + prototipo.getId() + " — " + prototipo.getNombre());
         lblFiltroDesc.setText(prototipo.getDescripcion());
-        lblFiltroTipos.setText("Entrada:  " + prototipo.getTipoEntrada()
-                + "          Salida:  " + prototipo.getTipoSalida());
+
+        boolean permiteDir = prototipo.getId() == 3 || prototipo.getId() == 4
+                || prototipo.getId() == 7 || prototipo.getId() == 8;
+        String tiposTexto = "Entrada:  " + prototipo.getTipoEntrada()
+                + "          Salida:  " + prototipo.getTipoSalida();
+        if (permiteDir) {
+            tiposTexto += "     (acepta archivo o directorio)";
+        }
+        lblFiltroTipos.setText(tiposTexto);
 
         boolean usaPrevio = datosPrevios != null;
         panelPrevio.setVisible(usaPrevio);
@@ -442,7 +449,12 @@ public class VistaEscritorio extends JFrame {
         }
 
         campoPalabra.setText("");
-        if (!usaPrevio) campoPath.setText("");
+        if (!usaPrevio) {
+            campoPath.setText("");
+            campoPath.setToolTipText(permiteDir
+                    ? "Escribe la ruta del archivo o directorio, o usa el botón Examinar"
+                    : "Escribe la ruta del archivo o usa el botón Examinar");
+        }
 
         lblHeader.setText("Paso 2 — Configurar: ID" + prototipo.getId()
                 + " · " + prototipo.getNombre());
@@ -544,14 +556,29 @@ public class VistaEscritorio extends JFrame {
 
         // ── Mostrar contenido del resultado ───────────────────────
         if (resultado.getTipo() == TipoDato.LISTA_IMAGEN) {
-            mostrarImagenes(resultado.getLista());
+            mostrarImagenes(resultado.getLista(), resultado.getNombres());
             cardTipoResultado.show(contenedorTipoResultado, "imagenes");
         } else {
-            String texto = (resultado.getDatos() != null)
-                    ? new String(resultado.getDatos(), StandardCharsets.UTF_8)
-                    : resultado.getLista() != null
-                        ? "(Lista de " + resultado.getLista().size() + " elementos)"
-                        : "(vacío)";
+            String texto;
+            if (resultado.getDatos() != null) {
+                texto = new String(resultado.getDatos(), StandardCharsets.UTF_8);
+            } else if (resultado.getLista() != null) {
+                List<String> nombres = resultado.getNombres();
+                StringBuilder sb = new StringBuilder();
+                sb.append("Se procesaron ").append(resultado.getLista().size())
+                  .append(" elemento(s):\n\n");
+                for (int i = 0; i < resultado.getLista().size(); i++) {
+                    String nombre = (nombres != null && i < nombres.size())
+                            ? nombres.get(i) : "Elemento " + (i + 1);
+                    int size = resultado.getLista().get(i) != null
+                            ? resultado.getLista().get(i).length : 0;
+                    sb.append("  • ").append(nombre)
+                      .append(" (").append(size).append(" bytes)\n");
+                }
+                texto = sb.toString();
+            } else {
+                texto = "(vacío)";
+            }
             areaTexto.setText(texto);
             areaTexto.setCaretPosition(0);
             cardTipoResultado.show(contenedorTipoResultado, "texto");
@@ -608,10 +635,16 @@ public class VistaEscritorio extends JFrame {
         return btn;
     }
 
-    /** Muestra las 4 imágenes resultado de FiltroImagenes en un grid 2×2. */
-    private void mostrarImagenes(List<byte[]> imagenes) {
+    /** Muestra las imágenes resultado de FiltroImagenes en un grid dinámico. */
+    private void mostrarImagenes(List<byte[]> imagenes, List<String> nombres) {
         gridImagenes.removeAll();
-        String[] etqs = {"Escala de grises", "Reducción 50%", "Brillo +50%", "Rotación 90°"};
+        String[] etqsDefault = {"Escala de grises", "Reducción 50%", "Brillo +50%", "Rotación 90°"};
+
+        // Grid dinámico: 4 columnas, filas según necesidad
+        int cols = Math.min(4, imagenes.size());
+        int rows = (int) Math.ceil(imagenes.size() / (double) cols);
+        gridImagenes.setLayout(new GridLayout(rows, cols, 10, 10));
+
         for (int i = 0; i < imagenes.size(); i++) {
             JPanel celda = new JPanel(new BorderLayout(0, 4));
             celda.setBackground(Color.WHITE);
@@ -619,13 +652,29 @@ public class VistaEscritorio extends JFrame {
             try {
                 BufferedImage bi = ImageIO.read(new ByteArrayInputStream(imagenes.get(i)));
                 if (bi != null) {
-                    Image scaled = bi.getScaledInstance(200, 180, Image.SCALE_SMOOTH);
+                    // Escalar proporcionalmente para el grid
+                    int maxW = 200, maxH = 180;
+                    double scale = Math.min((double) maxW / bi.getWidth(),
+                                            (double) maxH / bi.getHeight());
+                    int sw = (int)(bi.getWidth() * scale);
+                    int sh = (int)(bi.getHeight() * scale);
+                    Image scaled = bi.getScaledInstance(sw, sh, Image.SCALE_SMOOTH);
                     JLabel img = new JLabel(new ImageIcon(scaled), SwingConstants.CENTER);
                     celda.add(img, BorderLayout.CENTER);
                 }
             } catch (IOException ignored) { }
-            JLabel cap = new JLabel(i < etqs.length ? etqs[i] : "Filtro " + i, SwingConstants.CENTER);
-            cap.setFont(new Font("SansSerif", Font.BOLD, 11));
+
+            // Caption: usar nombre del resultado si existe, sino default
+            String caption;
+            if (nombres != null && i < nombres.size()) {
+                caption = nombres.get(i);
+            } else if (i < etqsDefault.length) {
+                caption = etqsDefault[i];
+            } else {
+                caption = "Filtro " + i;
+            }
+            JLabel cap = new JLabel(caption, SwingConstants.CENTER);
+            cap.setFont(new Font("SansSerif", Font.BOLD, 10));
             cap.setBorder(new EmptyBorder(2, 0, 5, 0));
             celda.add(cap, BorderLayout.SOUTH);
             gridImagenes.add(celda);
@@ -710,6 +759,13 @@ public class VistaEscritorio extends JFrame {
 
     /** Lee el archivo en la ruta dada y devuelve un PaqueteDatos con el tipo correcto. */
     private PaqueteDatos leerArchivo(TipoDato tipo, String ruta) {
+        File file = new File(ruta);
+
+        // ── Si es un directorio, leer todos los archivos relevantes ──
+        if (file.isDirectory()) {
+            return leerDirectorio(tipo, file);
+        }
+
         try {
             switch (tipo) {
                 case PATH:
@@ -733,7 +789,81 @@ public class VistaEscritorio extends JFrame {
     }
 
     /**
+     * Lee todos los archivos relevantes de un directorio y devuelve un PaqueteDatos tipo lista.
+     * Filtra los archivos según el tipo esperado por el filtro.
+     */
+    private PaqueteDatos leerDirectorio(TipoDato tipo, File dir) {
+        File[] archivos;
+        switch (tipo) {
+            case IMAGEN:
+                archivos = dir.listFiles((d, name) -> {
+                    String lower = name.toLowerCase();
+                    return lower.endsWith(".png") || lower.endsWith(".jpg")
+                            || lower.endsWith(".jpeg") || lower.endsWith(".gif")
+                            || lower.endsWith(".bmp");
+                });
+                break;
+            case BINARIO:
+            case LISTA_BINARIO:
+                archivos = dir.listFiles((d, name) -> {
+                    String lower = name.toLowerCase();
+                    return lower.endsWith(".bin") || lower.endsWith(".dat")
+                            || lower.endsWith(".txt");
+                });
+                break;
+            case BASE64:
+            case LISTA_BASE64:
+                archivos = dir.listFiles((d, name) -> {
+                    String lower = name.toLowerCase();
+                    return lower.endsWith(".b64") || lower.endsWith(".txt");
+                });
+                break;
+            default: // TEXTO, LISTA_TEXTO
+                archivos = dir.listFiles((d, name) ->
+                        !name.startsWith(".") && !new File(d, name).isDirectory());
+                break;
+        }
+
+        if (archivos == null || archivos.length == 0) {
+            JOptionPane.showMessageDialog(this,
+                    "No se encontraron archivos compatibles en el directorio:\n"
+                            + dir.getAbsolutePath(),
+                    "Directorio vacío", JOptionPane.WARNING_MESSAGE);
+            return null;
+        }
+
+        java.util.Arrays.sort(archivos);
+        java.util.List<byte[]> lista = new java.util.ArrayList<>();
+        java.util.List<String> nombres = new java.util.ArrayList<>();
+
+        for (File f : archivos) {
+            try {
+                lista.add(Files.readAllBytes(f.toPath()));
+                nombres.add(f.getName());
+                System.out.println("  [Vista] Archivo cargado: " + f.getName()
+                        + " (" + f.length() + " bytes)");
+            } catch (IOException e) {
+                System.err.println("  [Vista] Error leyendo: " + f.getName()
+                        + " - " + e.getMessage());
+            }
+        }
+
+        if (lista.isEmpty()) {
+            JOptionPane.showMessageDialog(this,
+                    "No se pudo leer ningún archivo del directorio.",
+                    "Error", JOptionPane.ERROR_MESSAGE);
+            return null;
+        }
+
+        TipoDato tipoLista = tipo.aLista();
+        System.out.println("  [Vista] Directorio cargado: " + lista.size()
+                + " archivos → tipo " + tipoLista);
+        return new PaqueteDatos(tipoLista, lista, nombres);
+    }
+
+    /**
      * Guarda el resultado automáticamente en output/ con nombre descriptivo.
+     * Soporta guardado individual por archivo cuando hay nombres disponibles.
      * @return El archivo creado, o null si falló.
      */
     private File autoGuardar(PaqueteDatos resultado, int idFiltro) {
@@ -741,16 +871,23 @@ public class VistaEscritorio extends JFrame {
         String ext = extensionPara(resultado.getTipo());
         try {
             if (resultado.getTipo() == TipoDato.LISTA_IMAGEN) {
-                // 4 imágenes — guardar cada una con sufijo descriptivo
-                String[] sufijos = {"gris", "reduccion50pct", "brillo", "rotacion90"};
+                // Imágenes — guardar cada una con su nombre
                 List<byte[]> imgs = resultado.getLista();
+                List<String> nombres = resultado.getNombres();
+                String[] sufijosDefault = {"gris", "reduccion50pct", "brillo", "rotacion90"};
+
                 for (int i = 0; i < imgs.size(); i++) {
-                    String suf = i < sufijos.length ? sufijos[i] : "img" + i;
-                    File f = new File(outputDir, "id" + idFiltro + "_" + suf + "_" + ts + ".png");
+                    String nombre;
+                    if (nombres != null && i < nombres.size()) {
+                        nombre = "id" + idFiltro + "_" + nombres.get(i) + "_" + ts + ".png";
+                    } else {
+                        String suf = i < sufijosDefault.length ? sufijosDefault[i] : "img" + i;
+                        nombre = "id" + idFiltro + "_" + suf + "_" + ts + ".png";
+                    }
+                    File f = new File(outputDir, nombre);
                     Files.write(f.toPath(), imgs.get(i));
                 }
-                // Devolver el primero (para mostrar en lblGuardado)
-                return new File(outputDir, "id" + idFiltro + "_gris_" + ts + ".png");
+                return new File(outputDir, "id" + idFiltro + "_" + imgs.size() + "imgs_" + ts);
 
             } else if (resultado.getDatos() != null) {
                 File archivo = new File(outputDir, "id" + idFiltro + "_" + ts + ext);
@@ -758,12 +895,30 @@ public class VistaEscritorio extends JFrame {
                 return archivo;
 
             } else if (resultado.getLista() != null) {
-                // Lista de texto o binario: concatenar
-                ByteArrayOutputStream baos = new ByteArrayOutputStream();
-                for (byte[] b : resultado.getLista()) baos.write(b);
-                File archivo = new File(outputDir, "id" + idFiltro + "_lista_" + ts + ext);
-                Files.write(archivo.toPath(), baos.toByteArray());
-                return archivo;
+                List<byte[]> items = resultado.getLista();
+                List<String> nombres = resultado.getNombres();
+
+                if (nombres != null && !nombres.isEmpty()) {
+                    // Guardar cada archivo individualmente con su nombre
+                    for (int i = 0; i < items.size(); i++) {
+                        String nombre;
+                        if (i < nombres.size()) {
+                            nombre = "id" + idFiltro + "_" + nombres.get(i) + "_" + ts + ext;
+                        } else {
+                            nombre = "id" + idFiltro + "_item" + i + "_" + ts + ext;
+                        }
+                        File f = new File(outputDir, nombre);
+                        Files.write(f.toPath(), items.get(i));
+                    }
+                    return new File(outputDir, "id" + idFiltro + "_" + items.size() + "archivos_" + ts);
+                } else {
+                    // Lista sin nombres: concatenar (comportamiento original)
+                    ByteArrayOutputStream baos = new ByteArrayOutputStream();
+                    for (byte[] b : items) baos.write(b);
+                    File archivo = new File(outputDir, "id" + idFiltro + "_lista_" + ts + ext);
+                    Files.write(archivo.toPath(), baos.toByteArray());
+                    return archivo;
+                }
             }
         } catch (IOException e) {
             System.err.println("[Vista] Error guardando resultado: " + e.getMessage());
@@ -779,9 +934,10 @@ public class VistaEscritorio extends JFrame {
         }
         JFileChooser fc = new JFileChooser(outputDir);
 
-        if (ultimoResultado.getTipo() == TipoDato.LISTA_IMAGEN) {
+        if (ultimoResultado.getTipo() == TipoDato.LISTA_IMAGEN
+                || (ultimoResultado.esLista() && ultimoResultado.getNombres() != null)) {
             fc.setFileSelectionMode(JFileChooser.DIRECTORIES_ONLY);
-            fc.setDialogTitle("Elige la carpeta donde guardar las 4 imágenes");
+            fc.setDialogTitle("Elige la carpeta donde guardar los archivos");
         } else {
             fc.setDialogTitle("Guardar resultado");
             fc.setSelectedFile(new File(outputDir,
@@ -793,12 +949,26 @@ public class VistaEscritorio extends JFrame {
 
         try {
             if (ultimoResultado.getTipo() == TipoDato.LISTA_IMAGEN) {
-                String[] sufijos = {"gris", "reduccion50pct", "brillo", "rotacion90"};
                 List<byte[]> imgs = ultimoResultado.getLista();
+                List<String> nombres = ultimoResultado.getNombres();
+                String[] sufijosDefault = {"gris", "reduccion50pct", "brillo", "rotacion90"};
                 for (int i = 0; i < imgs.size(); i++) {
-                    String suf = i < sufijos.length ? sufijos[i] : "img" + i;
-                    Files.write(new File(fc.getSelectedFile(), "imagen_" + suf + ".png").toPath(),
-                            imgs.get(i));
+                    String nombre;
+                    if (nombres != null && i < nombres.size()) {
+                        nombre = nombres.get(i) + ".png";
+                    } else {
+                        String suf = i < sufijosDefault.length ? sufijosDefault[i] : "img" + i;
+                        nombre = "imagen_" + suf + ".png";
+                    }
+                    Files.write(new File(fc.getSelectedFile(), nombre).toPath(), imgs.get(i));
+                }
+            } else if (ultimoResultado.esLista() && ultimoResultado.getNombres() != null) {
+                List<byte[]> items = ultimoResultado.getLista();
+                List<String> nombres = ultimoResultado.getNombres();
+                String ext = extensionPara(ultimoResultado.getTipo());
+                for (int i = 0; i < items.size(); i++) {
+                    String nombre = (i < nombres.size()) ? nombres.get(i) + ext : "item" + i + ext;
+                    Files.write(new File(fc.getSelectedFile(), nombre).toPath(), items.get(i));
                 }
             } else if (ultimoResultado.getDatos() != null) {
                 Files.write(fc.getSelectedFile().toPath(), ultimoResultado.getDatos());
@@ -813,7 +983,18 @@ public class VistaEscritorio extends JFrame {
     /** Abre un JFileChooser filtrando por el tipo de archivo esperado. */
     private void examinar() {
         JFileChooser fc = new JFileChooser();
-        fc.setDialogTitle("Seleccionar archivo de entrada");
+
+        // Permitir seleccionar directorios para filtros que soportan múltiples archivos
+        boolean permiteDirectorio = filtroActual != null
+                && (filtroActual.getId() == 3 || filtroActual.getId() == 4
+                    || filtroActual.getId() == 7 || filtroActual.getId() == 8);
+
+        if (permiteDirectorio) {
+            fc.setFileSelectionMode(JFileChooser.FILES_AND_DIRECTORIES);
+            fc.setDialogTitle("Seleccionar archivo o directorio de entrada");
+        } else {
+            fc.setDialogTitle("Seleccionar archivo de entrada");
+        }
 
         if (filtroActual != null) {
             switch (filtroActual.getTipoEntrada()) {

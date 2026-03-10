@@ -21,29 +21,41 @@ public class PaqueteDatos {
     private final TipoDato     tipo;
     private final byte[]       datos;    // elemento único
     private final List<byte[]> lista;    // múltiples elementos
+    private final List<String> nombres;  // nombres de archivo opcionales
 
     // ── Constructores ─────────────────────────────────────────────
 
     /** Crea un paquete con un único elemento. */
     public PaqueteDatos(TipoDato tipo, byte[] datos) {
-        this.tipo  = tipo;
-        this.datos = datos;
-        this.lista = null;
+        this.tipo    = tipo;
+        this.datos   = datos;
+        this.lista   = null;
+        this.nombres = null;
     }
 
     /** Crea un paquete con múltiples elementos. */
     public PaqueteDatos(TipoDato tipo, List<byte[]> lista) {
-        this.tipo  = tipo;
-        this.datos = null;
-        this.lista = lista;
+        this.tipo    = tipo;
+        this.datos   = null;
+        this.lista   = lista;
+        this.nombres = null;
+    }
+
+    /** Crea un paquete con múltiples elementos y nombres de archivo. */
+    public PaqueteDatos(TipoDato tipo, List<byte[]> lista, List<String> nombres) {
+        this.tipo    = tipo;
+        this.datos   = null;
+        this.lista   = lista;
+        this.nombres = nombres;
     }
 
     // ── Getters ───────────────────────────────────────────────────
 
-    public TipoDato     getTipo()  { return tipo; }
-    public byte[]       getDatos() { return datos; }
-    public List<byte[]> getLista() { return lista; }
-    public boolean      esLista()  { return lista != null; }
+    public TipoDato     getTipo()    { return tipo; }
+    public byte[]       getDatos()   { return datos; }
+    public List<byte[]> getLista()   { return lista; }
+    public List<String> getNombres() { return nombres; }
+    public boolean      esLista()    { return lista != null; }
 
     // ── Conversiones automáticas ──────────────────────────────────
 

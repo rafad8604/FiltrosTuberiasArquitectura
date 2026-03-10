@@ -37,6 +37,7 @@ public class BuscarPalabraEnArchivoTexto implements IFiltroMultiple {
         // Auto-wrap texto simple → lista para procesamiento uniforme
         PaqueteDatos lista = entrada.esLista() ? entrada : entrada.aLista();
         List<byte[]> textos = lista.getLista();
+        List<String> nombres = lista.getNombres();
 
         System.out.println("  [ID7] Buscando \"" + palabraBuscar + "\" en "
                 + textos.size() + " texto(s) con " + getNumHilos() + " hilos...");
@@ -52,6 +53,8 @@ public class BuscarPalabraEnArchivoTexto implements IFiltroMultiple {
         for (int i = 0; i < textos.size(); i++) {
             final int idx = i;
             final byte[] bytes = textos.get(i);
+            final String nombreArchivo = (nombres != null && i < nombres.size())
+                    ? nombres.get(i) : null;
             futures.add(pool.submit(() -> {
                 String texto = new String(bytes).toLowerCase();
                 int ocurrencias = contarOcurrencias(texto);
@@ -65,7 +68,8 @@ public class BuscarPalabraEnArchivoTexto implements IFiltroMultiple {
                           + "\" no fue encontrada en el texto.";
 
                 parciales.set(idx, resultado);
-                System.out.println("  [ID7] Hilo-" + idx + ": " + resultado);
+                String label = nombreArchivo != null ? nombreArchivo : "Hilo-" + idx;
+                System.out.println("  [ID7] " + label + ": " + resultado);
             }));
         }
 
@@ -78,10 +82,15 @@ public class BuscarPalabraEnArchivoTexto implements IFiltroMultiple {
         // ── Ensamblar respuesta ─────────────────────────────────────
         StringBuilder sb = new StringBuilder();
         sb.append("Búsqueda de \"").append(palabraBuscar).append("\"\n");
-        sb.append("─".repeat(40)).append("\n");
+        sb.append("─".repeat(50)).append("\n");
         for (int i = 0; i < parciales.size(); i++) {
-            if (parciales.size() > 1) sb.append("Texto #").append(i + 1).append(": ");
+            if (nombres != null && i < nombres.size()) {
+                sb.append("Archivo: ").append(nombres.get(i)).append("\n  → ");
+            } else if (parciales.size() > 1) {
+                sb.append("Texto #").append(i + 1).append(": ");
+            }
             sb.append(parciales.get(i) != null ? parciales.get(i) : "[error]").append("\n");
+            if (nombres != null) sb.append("\n");
         }
 
         return new PaqueteDatos(TipoDato.TEXTO, sb.toString().getBytes());
@@ -110,7 +119,7 @@ public class BuscarPalabraEnArchivoTexto implements IFiltroMultiple {
     @Override public int      getId()          { return 7; }
     @Override public String   getNombre()       { return "BuscarPalabraEnArchivoTexto"; }
     @Override public String   getDescripcion()  {
-        return "Verifica si una palabra específica existe en el texto (SÍ / NO)";
+        return "Busca una palabra en un archivo o directorio de archivos (indica línea y archivo).";
     }
     @Override public TipoDato getTipoEntrada()  { return TipoDato.TEXTO; }
     @Override public TipoDato getTipoSalida()   { return TipoDato.TEXTO; }

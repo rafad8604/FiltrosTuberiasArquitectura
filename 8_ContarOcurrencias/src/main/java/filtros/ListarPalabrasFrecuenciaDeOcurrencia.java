@@ -40,6 +40,7 @@ public class ListarPalabrasFrecuenciaDeOcurrencia implements IFiltroMultiple {
         // Auto-wrap texto simple → lista
         PaqueteDatos lista = entrada.esLista() ? entrada : entrada.aLista();
         List<byte[]> textos = lista.getLista();
+        List<String> nombres = lista.getNombres();
 
         System.out.println("  [ID8] Contando \"" + palabraBuscar + "\" en "
                 + textos.size() + " texto(s) con " + getNumHilos() + " hilos...");
@@ -56,11 +57,14 @@ public class ListarPalabrasFrecuenciaDeOcurrencia implements IFiltroMultiple {
         for (int i = 0; i < textos.size(); i++) {
             final int idx = i;
             final byte[] bytes = textos.get(i);
+            final String nombreArchivo = (nombres != null && i < nombres.size())
+                    ? nombres.get(i) : null;
             futures.add(pool.submit(() -> {
                 int count = contarOcurrencias(new String(bytes).toLowerCase());
                 conteoPorTexto.get(idx)[0] = count;
                 totalGlobal.addAndGet(count);
-                System.out.println("  [ID8] Hilo-" + idx + ": " + count + " ocurrencia(s) ✔");
+                String label = nombreArchivo != null ? nombreArchivo : "Hilo-" + idx;
+                System.out.println("  [ID8] " + label + ": " + count + " ocurrencia(s) ✔");
             }));
         }
 
@@ -73,19 +77,25 @@ public class ListarPalabrasFrecuenciaDeOcurrencia implements IFiltroMultiple {
         // ── Ensamblar respuesta ─────────────────────────────────────
         StringBuilder sb = new StringBuilder();
         sb.append("Conteo de \"").append(palabraBuscar).append("\"\n");
-        sb.append("─".repeat(40)).append("\n");
+        sb.append("─".repeat(50)).append("\n");
 
         if (textos.size() == 1) {
             int c = conteoPorTexto.get(0)[0];
+            if (nombres != null && !nombres.isEmpty()) {
+                sb.append("Archivo: ").append(nombres.get(0)).append("\n");
+            }
             sb.append(c > 0
                     ? "La palabra \"" + palabraBuscar + "\" aparece " + c + " veces en el texto."
                     : "La palabra \"" + palabraBuscar + "\" no aparece en el texto.");
         } else {
             for (int i = 0; i < conteoPorTexto.size(); i++) {
-                sb.append("Texto #").append(i + 1).append(": ")
+                String label = (nombres != null && i < nombres.size())
+                        ? "Archivo: " + nombres.get(i)
+                        : "Texto #" + (i + 1);
+                sb.append(label).append(": ")
                   .append(conteoPorTexto.get(i)[0]).append(" ocurrencia(s)\n");
             }
-            sb.append("─".repeat(40)).append("\n");
+            sb.append("─".repeat(50)).append("\n");
             sb.append("Total: ").append(totalGlobal.get()).append(" ocurrencia(s)");
         }
 
@@ -104,7 +114,7 @@ public class ListarPalabrasFrecuenciaDeOcurrencia implements IFiltroMultiple {
     @Override public int      getId()          { return 8; }
     @Override public String   getNombre()       { return "ContarOcurrenciasDePalabra"; }
     @Override public String   getDescripcion()  {
-        return "Cuenta cuántas veces aparece una palabra específica en el texto";
+        return "Cuenta ocurrencias de una palabra en un archivo o directorio de archivos.";
     }
     @Override public TipoDato getTipoEntrada()  { return TipoDato.TEXTO; }
     @Override public TipoDato getTipoSalida()   { return TipoDato.TEXTO; }
