@@ -1,0 +1,102 @@
+@startuml PaquetesArquitectura
+
+' Diagrama de Paquetes - Arquitectura Pipes & Filters
+
+title Diagrama de Paquetes - Tuberías y Filtros
+
+left to right direction
+
+skinparam packageStyle rectangle
+skinparam shadowing false
+skinparam BackgroundColor #f8f8f8
+skinparam defaultTextAlignment center
+
+skinparam package {
+  BorderColor #555555
+  BackgroundColor #EFEFEF
+}
+
+skinparam note {
+  BackgroundColor #FFFFFF
+}
+
+' Paquete raíz que representa el proyecto completo
+package "tuberias_filtros" {
+
+  package "inicio" #E3F2FD {
+    [InicioAplicacion]
+  }
+
+  package "presentacion" #F3E5F5 {
+    [VistaEscritorio]
+  }
+
+  package "fabrica" #FCE4EC {
+    [FabricaFiltros]
+  }
+
+  package "motor" #FFF3E0 {
+    [Tuberia]
+    [GestorTuberias]
+  }
+
+  package "interfaces" #E8EAF6 {
+    [IFiltro]
+    [IFiltroMultiple]
+  }
+
+  package "datos" #E8F5E9 {
+    [PaqueteDatos]
+    [TipoDato]
+  }
+
+  package "filtros" #FAFAFA {
+    [CargarArchivoDeTexto]
+    [ConvertirTextoABinario]
+    [FiltroImagenes]
+    [ConvertirBinarioABase64]
+    [ConvertirBase64ABinario]
+    [EncriptarArchivoTextoSHA256]
+    [BuscarPalabraEnArchivoTexto]
+    [ListarPalabrasFrecuenciaDeOcurrencia]
+  }
+}
+
+' Dependencias principales entre paquetes (estética similar a la imagen)
+inicio -[#gray;dashed]-> presentacion : «crea»
+inicio -[#gray;dashed]-> fabrica      : «crea»
+
+presentacion -[#gray;dashed]-> fabrica      : «usa»
+presentacion -[#gray;dashed]-> motor        : «usa»
+presentacion -[#gray;dashed]-> interfaces   : «importa»
+presentacion -[#gray;dashed]-> datos        : «importa»
+
+fabrica -[#gray;dashed]-> motor        : «crea»
+fabrica -[#gray;dashed]-> interfaces   : «usa»
+fabrica -[#gray;dashed]-> datos        : «importa»
+
+motor -[#gray;dashed]-> interfaces     : «usa»
+motor -[#gray;dashed]-> datos          : «importa»
+
+filtros -[#gray;dashed]-> interfaces   : «implementa»
+filtros -[#gray;dashed]-> datos        : «importa»
+
+' Enlaces ocultos para ordenar los paquetes y reducir cruces
+inicio -[hidden]-> presentacion
+presentacion -[hidden]-> fabrica
+fabrica -[hidden]-> motor
+motor -[hidden]-> interfaces
+interfaces -[hidden]-> datos
+datos -[hidden]-> filtros
+
+' Leyenda
+legend right
+|= Estructura |= Significado |
+| paquete raíz (tuberias_filtros) | proyecto completo |
+| subpaquetes (inicio, motor, ...) | módulos / capas |
+| paquete filtros | colección de filtros ID1..ID8 |
+| flecha discontinua | dependencia entre paquetes |
+end legend
+
+@enduml
+

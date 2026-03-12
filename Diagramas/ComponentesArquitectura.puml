@@ -1,0 +1,77 @@
+@startuml ComponentesArquitectura
+
+' Diagrama de Componentes - Arquitectura Pipes & Filters
+
+skinparam componentStyle rectangle
+
+title Arquitectura general - Tuberías y Filtros
+
+package "Presentación" {
+  [VistaEscritorio] as C_Presentacion
+}
+
+package "Inicio" {
+  [InicioAplicacion] as C_Inicio
+}
+
+package "Fábrica" {
+  [FabricaFiltros] as C_Fabrica
+}
+
+package "Motor" {
+  [GestorTuberias] as C_Gestor
+  [Tuberia] as C_Tuberia
+}
+
+package "DTO / Datos" {
+  [PaqueteDatos] as C_Datos
+  [TipoDato] as C_TipoDato
+}
+
+package "Interfaces" {
+  [IFiltro] as C_IFiltro
+  [IFiltroMultiple] as C_IFiltroMultiple
+}
+
+package "Filtros (1..8)" {
+  [ID1_CargarArchivo]
+  [ID2_TextoABinario]
+  [ID3_FiltroImagenes]
+  [ID4_BinarioABase64]
+  [ID5_Base64ABinario]
+  [ID6_EncriptarSHA256]
+  [ID7_BuscarPalabra]
+  [ID8_ContarOcurrencias]
+}
+
+' Relaciones principales
+C_Inicio --> C_Presentacion : inyecta VistaEscritorio\n(Dependency Injection)
+C_Presentacion --> C_Fabrica : solicita creación de filtros y gestor
+C_Presentacion --> C_Gestor : configura y ejecuta tuberías
+
+C_Fabrica --> C_Gestor
+C_Fabrica --> C_Tuberia
+C_Fabrica --> C_IFiltro
+C_Fabrica --> C_IFiltroMultiple
+
+C_Gestor --> C_Tuberia
+C_Gestor --> C_Datos
+
+C_Tuberia --> C_IFiltro
+C_Tuberia --> C_Datos
+C_Tuberia --> C_TipoDato
+
+C_IFiltro --> C_Datos
+C_IFiltroMultiple --> C_Datos
+
+[ID1_CargarArchivo] ..|> C_IFiltro
+[ID2_TextoABinario] ..|> C_IFiltro
+[ID3_FiltroImagenes] ..|> C_IFiltroMultiple
+[ID4_BinarioABase64] ..|> C_IFiltroMultiple
+[ID5_Base64ABinario] ..|> C_IFiltro
+[ID6_EncriptarSHA256] ..|> C_IFiltro
+[ID7_BuscarPalabra] ..|> C_IFiltro
+[ID8_ContarOcurrencias] ..|> C_IFiltro
+
+@enduml
+
