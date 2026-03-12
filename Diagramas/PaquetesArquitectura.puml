@@ -2,7 +2,7 @@
 
 ' Diagrama de Paquetes - Arquitectura Pipes & Filters
 
-title Diagrama de Paquetes - Tuberías y Filtros
+title Diagrama de Paquetes - Tuberías y Filtros (CLI)
 
 left to right direction
 
@@ -20,29 +20,15 @@ skinparam note {
   BackgroundColor #FFFFFF
 }
 
-' Paquete raíz que representa el proyecto completo
+' Paquete raíz que representa el proyecto CLI
 package "tuberias_filtros" {
 
   package "inicio" #E3F2FD {
-    [InicioAplicacion]
-  }
-
-  package "presentacion" #F3E5F5 {
-    [VistaEscritorio]
-  }
-
-  package "fabrica" #FCE4EC {
-    [FabricaFiltros]
+    [MainPipeline]
   }
 
   package "motor" #FFF3E0 {
-    [Tuberia]
-    [GestorTuberias]
-  }
-
-  package "interfaces" #E8EAF6 {
-    [IFiltro]
-    [IFiltroMultiple]
+    [PipelineManager]
   }
 
   package "datos" #E8F5E9 {
@@ -51,50 +37,36 @@ package "tuberias_filtros" {
   }
 
   package "filtros" #FAFAFA {
-    [CargarArchivoDeTexto]
-    [ConvertirTextoABinario]
-    [FiltroImagenes]
-    [ConvertirBinarioABase64]
-    [ConvertirBase64ABinario]
-    [EncriptarArchivoTextoSHA256]
-    [BuscarPalabraEnArchivoTexto]
-    [ListarPalabrasFrecuenciaDeOcurrencia]
+    [CargarArchivoDeTextoStandalone]
+    [ConvertirTextoABinarioStandalone]
+    [FiltroImagenesStandalone]
+    [ConvertirBinarioABase64Standalone]
+    [ConvertirBase64ABinarioStandalone]
+    [EncriptarArchivoTextoSHA256Standalone]
+    [BuscarPalabraEnArchivoTextoStandalone]
+    [ListarPalabrasFrecuenciaDeOcurrenciaStandalone]
   }
 }
 
-' Dependencias principales entre paquetes (estética similar a la imagen)
-inicio -[#gray;dashed]-> presentacion : «crea»
-inicio -[#gray;dashed]-> fabrica      : «crea»
+' Dependencias principales entre paquetes (CLI)
+inicio -[#gray;dashed]-> motor        : «usa»
+inicio -[#gray;dashed]-> datos        : «importa»
 
-presentacion -[#gray;dashed]-> fabrica      : «usa»
-presentacion -[#gray;dashed]-> motor        : «usa»
-presentacion -[#gray;dashed]-> interfaces   : «importa»
-presentacion -[#gray;dashed]-> datos        : «importa»
+motor -[#gray;dashed]-> datos         : «usa»
 
-fabrica -[#gray;dashed]-> motor        : «crea»
-fabrica -[#gray;dashed]-> interfaces   : «usa»
-fabrica -[#gray;dashed]-> datos        : «importa»
-
-motor -[#gray;dashed]-> interfaces     : «usa»
-motor -[#gray;dashed]-> datos          : «importa»
-
-filtros -[#gray;dashed]-> interfaces   : «implementa»
 filtros -[#gray;dashed]-> datos        : «importa»
 
 ' Enlaces ocultos para ordenar los paquetes y reducir cruces
-inicio -[hidden]-> presentacion
-presentacion -[hidden]-> fabrica
-fabrica -[hidden]-> motor
-motor -[hidden]-> interfaces
-interfaces -[hidden]-> datos
+inicio -[hidden]-> motor
+motor -[hidden]-> datos
 datos -[hidden]-> filtros
 
 ' Leyenda
 legend right
 |= Estructura |= Significado |
-| paquete raíz (tuberias_filtros) | proyecto completo |
-| subpaquetes (inicio, motor, ...) | módulos / capas |
-| paquete filtros | colección de filtros ID1..ID8 |
+| paquete raíz (tuberias_filtros) | proyecto CLI |
+| subpaquetes (inicio, motor, datos, filtros) | capas lógicas |
+| paquete filtros | filtros standalone (JAR) ejecutados por SO |
 | flecha discontinua | dependencia entre paquetes |
 end legend
 

@@ -1,62 +1,47 @@
 @startuml ClasesArquitectura
 
-' Diagrama de Clases - Arquitectura Pipes & Filters
+' Diagrama de Clases - Arquitectura Pipes & Filters (solo CLI)
 
 skinparam classAttributeIconSize 0
 
-title Diagrama de clases principal - Tuberías y Filtros
-
-namespace presentacion {
-  class VistaEscritorio {
-    - gestorTuberias : motor.GestorTuberias
-    --
-    + configurarTuberia()
-    + ejecutarTuberia()
-  }
-}
+title Diagrama de clases CLI - MainPipeline
 
 namespace inicio {
-  class InicioAplicacion {
+  class MainPipeline {
     + main(args : String[])
-  }
-}
-
-namespace fabrica {
-  class FabricaFiltros {
-    - instancia : FabricaFiltros
     --
-    + getInstancia() : FabricaFiltros
-    + crearFiltro(id : int) : interfaces.IFiltro
-    + crearGestorTuberias() : motor.GestorTuberias
+    - construirEntrada(archivo : File, primerFiltroId : int) : datos.PaqueteDatos
+    - leerDirectorio(directorio : File, filtroId : int) : datos.PaqueteDatos
+    - guardarResultado(resultado : datos.PaqueteDatos, outputDir : File, filtroIds : List<int>)
+    - mostrarAyuda() : void
   }
 }
 
 namespace motor {
-  class GestorTuberias {
-    - tuberias : List<Tuberia>
-    --
-    + crearTuberia(nombre : String) : Tuberia
-    + ejecutar(nombre : String, entrada : datos.PaqueteDatos) : datos.PaqueteDatos
+  class PipelineManager {
+    + ejecutar(entradaInicial : datos.PaqueteDatos, pasos : List<PasoFiltro>) : datos.PaqueteDatos
   }
 
-  class Tuberia {
-    - nombre : String
-    - filtros : List<interfaces.IFiltro>
-    --
-    + agregarFiltro(filtro : interfaces.IFiltro) : boolean
-    + ejecutar(entradaInicial : datos.PaqueteDatos) : datos.PaqueteDatos
+  class PasoFiltro {
+    - jarPath : String
+    - argumentoExtra : String
   }
 }
 
 namespace datos {
   class PaqueteDatos {
     - tipo : TipoDato
-    - contenido : Object
+    - datos : byte[]
+    - lista : List<byte[]>
+    - nombres : List<String>
     --
     + getTipo() : TipoDato
-    + getContenido() : Object
+    + getDatos() : byte[]
+    + getLista() : List<byte[]>
+    + getNombres() : List<String>
     + aLista() : PaqueteDatos
     + primerElemento() : PaqueteDatos
+    + setParametros(palabra : String) : void
   }
 
   enum TipoDato {
@@ -64,68 +49,50 @@ namespace datos {
     BINARIO
     BASE64
     IMAGEN
+    PATH
     LISTA_TEXTO
     LISTA_BINARIO
     LISTA_BASE64
     LISTA_IMAGEN
   }
-}
 
-namespace interfaces {
-  interface IFiltro {
-    + getId() : int
-    + getNombre() : String
-    + getTipoEntrada() : datos.TipoDato
-    + getTipoSalida() : datos.TipoDato
-    + procesar(entrada : datos.PaqueteDatos) : datos.PaqueteDatos
-  }
-
-  interface IFiltroMultiple {
-    + getId() : int
-    + getNombre() : String
-    + getTipoEntrada() : datos.TipoDato
-    + getTipoSalida() : datos.TipoDato
-    + procesarLista(entrada : datos.PaqueteDatos) : datos.PaqueteDatos
+  class ProtocoloPipe {
+    + leer(in : InputStream) : PaqueteDatos
+    + escribir(out : OutputStream, datos : PaqueteDatos) : void
   }
 }
 
 namespace filtros {
-  class CargarArchivoDeTexto
-  class ConvertirTextoABinario
-  class FiltroImagenes
-  class ConvertirBinarioABase64
-  class ConvertirBase64ABinario
-  class EncriptarArchivoTextoSHA256
-  class BuscarPalabraEnArchivoTexto
-  class ListarPalabrasFrecuenciaDeOcurrencia
+  class CargarArchivoDeTextoStandalone
+  class ConvertirTextoABinarioStandalone
+  class FiltroImagenesStandalone
+  class ConvertirBinarioABase64Standalone
+  class ConvertirBase64ABinarioStandalone
+  class EncriptarArchivoTextoSHA256Standalone
+  class BuscarPalabraEnArchivoTextoStandalone
+  class ListarPalabrasFrecuenciaDeOcurrenciaStandalone
 }
 
-' Relaciones principales
-inicio.InicioAplicacion --> presentacion.VistaEscritorio
-presentacion.VistaEscritorio --> motor.GestorTuberias
-presentacion.VistaEscritorio --> fabrica.FabricaFiltros
+' Relaciones principales CLI
+inicio.MainPipeline --> motor.PipelineManager
+inicio.MainPipeline --> datos.PaqueteDatos
+inicio.MainPipeline --> datos.TipoDato
 
-fabrica.FabricaFiltros --> motor.GestorTuberias
-fabrica.FabricaFiltros --> motor.Tuberia
-fabrica.FabricaFiltros --> interfaces.IFiltro
-fabrica.FabricaFiltros --> interfaces.IFiltroMultiple
+motor.PipelineManager "1" o-- "*" motor.PasoFiltro
+motor.PipelineManager --> datos.ProtocoloPipe
+motor.PipelineManager --> datos.PaqueteDatos
 
-motor.GestorTuberias "1" o-- "*" motor.Tuberia
-motor.Tuberia "1" o-- "*" interfaces.IFiltro
-motor.Tuberia --> datos.PaqueteDatos
 datos.PaqueteDatos --> datos.TipoDato
+datos.ProtocoloPipe --> datos.PaqueteDatos
 
-interfaces.IFiltro --> datos.PaqueteDatos
-interfaces.IFiltroMultiple --> datos.PaqueteDatos
-
-filtros.CargarArchivoDeTexto ..|> interfaces.IFiltro
-filtros.ConvertirTextoABinario ..|> interfaces.IFiltro
-filtros.FiltroImagenes ..|> interfaces.IFiltroMultiple
-filtros.ConvertirBinarioABase64 ..|> interfaces.IFiltroMultiple
-filtros.ConvertirBase64ABinario ..|> interfaces.IFiltro
-filtros.EncriptarArchivoTextoSHA256 ..|> interfaces.IFiltro
-filtros.BuscarPalabraEnArchivoTexto ..|> interfaces.IFiltro
-filtros.ListarPalabrasFrecuenciaDeOcurrencia ..|> interfaces.IFiltro
+filtros.CargarArchivoDeTextoStandalone --> datos.ProtocoloPipe
+filtros.ConvertirTextoABinarioStandalone --> datos.ProtocoloPipe
+filtros.FiltroImagenesStandalone --> datos.ProtocoloPipe
+filtros.ConvertirBinarioABase64Standalone --> datos.ProtocoloPipe
+filtros.ConvertirBase64ABinarioStandalone --> datos.ProtocoloPipe
+filtros.EncriptarArchivoTextoSHA256Standalone --> datos.ProtocoloPipe
+filtros.BuscarPalabraEnArchivoTextoStandalone --> datos.ProtocoloPipe
+filtros.ListarPalabrasFrecuenciaDeOcurrenciaStandalone --> datos.ProtocoloPipe
 
 @enduml
 
