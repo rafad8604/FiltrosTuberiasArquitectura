@@ -1,0 +1,9 @@
+Proyecto de ejemplo para pruebas de archivos.
+
+Este archivo contiene varias palabras repetidas para poder:
+- buscar una palabra en el texto,
+- calcular frecuencias,
+- convertir a binario y a Base64,
+- generar un hash SHA-256.
+
+Palabras clave: bosque, río, bosque, Villavicencio, Meta, bosque.

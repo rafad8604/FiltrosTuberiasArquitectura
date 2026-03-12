@@ -12,6 +12,7 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Paths;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 
 /**
@@ -80,7 +81,21 @@ public class MainPipeline {
             // ── Verificar archivo de entrada ─────────────────────
             File archivo = new File(archivoEntrada);
             if (!archivo.exists()) {
-                System.err.println("✘ Archivo no encontrado: " + archivoEntrada);
+                System.err.println("✘ Archivo o directorio no encontrado: " + archivoEntrada);
+                System.exit(1);
+            }
+
+            // Validación: si es directorio con filtro 1, error
+            if (archivo.isDirectory() && filtroIds.get(0) == 1) {
+                System.err.println("✘ No se puede usar filtro 1 (CargarArchivo) con directorios.");
+                System.err.println("   Filtro 1 espera una ruta de archivo, no un directorio.");
+                System.err.println("   \n   Opciones:");
+                System.err.println("   • Pasá un archivo individual: java ... archivo.txt 1 ...");
+                System.err.println("   • O usá filtros 3, 4, 7, 8 que soportan directorios:");
+                System.err.println("     - Filtro 3: Imágenes");
+                System.err.println("     - Filtro 4: Binarios");
+                System.err.println("     - Filtro 7: Buscar palabra");
+                System.err.println("     - Filtro 8: Contar ocurrencias");
                 System.exit(1);
             }
 
@@ -149,19 +164,33 @@ public class MainPipeline {
     }
 
     /**
-     * Construye el PaqueteDatos inicial leyendo el archivo de entrada.
+     * Construye el PaqueteDatos inicial leyendo el archivo o directorio de entrada.
      * El tipo se infiere según el primer filtro del pipeline.
+     * 
+     * Si es un directorio:
+     *  - Filtro 1: Lee todos los .txt como LISTA_TEXTO
+     *  - Filtro 3: Lee imágenes como LISTA_IMAGEN
+     *  - Filtro 4: Lee binarios como LISTA_BINARIO
+     *  - Filtro 5: Lee Base64 como LISTA_BASE64
+     *  - Otros: Lee textos como LISTA_TEXTO
      */
-    private static PaqueteDatos construirEntrada(File archivo, int primerFiltroId)
+    private static PaqueteDatos construirEntrada(File archivoODir, int primerFiltroId)
             throws IOException {
 
+        // Si es un directorio, leer todos los archivos relevantes
+        if (archivoODir.isDirectory()) {
+            return leerDirectorio(archivoODir, primerFiltroId);
+        }
+
+        // Si es un archivo simple:
         // Para el filtro 1 (CargarArchivo), basta con enviar la ruta
         if (primerFiltroId == 1) {
             return new PaqueteDatos(TipoDato.PATH,
-                    archivo.getAbsolutePath().getBytes(StandardCharsets.UTF_8));
+                    archivoODir.getAbsolutePath().getBytes(StandardCharsets.UTF_8));
         }
 
-        byte[] bytes = Files.readAllBytes(archivo.toPath());
+        // Para otros filtros, leer el contenido del archivo
+        byte[] bytes = Files.readAllBytes(archivoODir.toPath());
 
         switch (primerFiltroId) {
             case 3:  return new PaqueteDatos(TipoDato.IMAGEN,  bytes);
@@ -169,6 +198,105 @@ public class MainPipeline {
             case 5:  return new PaqueteDatos(TipoDato.BASE64,  bytes);
             default: return new PaqueteDatos(TipoDato.TEXTO,   bytes);
         }
+    }
+
+    /**
+     * Lee todos los archivos relevantes de un directorio según el filtro.
+     * Filtra por extensión según el tipo de datos esperado.
+     */
+    private static PaqueteDatos leerDirectorio(File directorio, int filtroId)
+            throws IOException {
+
+        File[] archivos = null;
+
+        // Determinar qué archivos leer según el filtro
+        switch (filtroId) {
+            case 1: // CargarArchivo — leer archivos de texto
+                archivos = directorio.listFiles((d, name) -> {
+                    String lower = name.toLowerCase();
+                    return lower.endsWith(".txt") || lower.endsWith(".md")
+                            || lower.endsWith(".csv") || lower.endsWith(".log");
+                });
+                break;
+            case 3: // IMAGEN — filtrar por extensiones de imagen
+                archivos = directorio.listFiles((d, name) -> {
+                    String lower = name.toLowerCase();
+                    return lower.endsWith(".png") || lower.endsWith(".jpg")
+                            || lower.endsWith(".jpeg") || lower.endsWith(".gif")
+                            || lower.endsWith(".bmp");
+                });
+                break;
+            case 4: // BINARIO — filtrar por extensiones binarias
+                archivos = directorio.listFiles((d, name) -> {
+                    String lower = name.toLowerCase();
+                    return lower.endsWith(".bin") || lower.endsWith(".dat")
+                            || lower.endsWith(".txt");
+                });
+                break;
+            case 5: // BASE64 — filtrar por extensiones Base64
+                archivos = directorio.listFiles((d, name) -> {
+                    String lower = name.toLowerCase();
+                    return lower.endsWith(".b64") || lower.endsWith(".txt");
+                });
+                break;
+            case 7:
+            case 8: // TEXTO — leer archivos de texto
+                archivos = directorio.listFiles((d, name) -> {
+                    String lower = name.toLowerCase();
+                    return (lower.endsWith(".txt") || lower.endsWith(".md")
+                            || lower.endsWith(".csv") || lower.endsWith(".log"))
+                            && !new File(d, name).isDirectory();
+                });
+                break;
+            default: // TEXTO genérico
+                archivos = directorio.listFiles((d, name) ->
+                        !name.startsWith(".") && !new File(d, name).isDirectory());
+                break;
+        }
+
+        if (archivos == null || archivos.length == 0) {
+            System.err.println("✘ No se encontraron archivos compatibles en: "
+                    + directorio.getAbsolutePath());
+            System.exit(1);
+        }
+
+        // Ordenar alfabéticamente para consistencia
+        Arrays.sort(archivos);
+
+        List<byte[]> lista = new ArrayList<>();
+        List<String> nombres = new ArrayList<>();
+
+        System.err.println("📁 Cargando directorio: " + directorio.getName()
+                + " (" + archivos.length + " archivo(s))");
+
+        for (File f : archivos) {
+            try {
+                lista.add(Files.readAllBytes(f.toPath()));
+                nombres.add(f.getName());
+                System.err.println("   ✔ " + f.getName() + " (" + f.length() + " bytes)");
+            } catch (IOException e) {
+                System.err.println("   ✘ Error leyendo " + f.getName()
+                        + ": " + e.getMessage());
+            }
+        }
+
+        if (lista.isEmpty()) {
+            System.err.println("✘ No se pudo leer ningún archivo del directorio.");
+            System.exit(1);
+        }
+
+        // Determinar el tipo LISTA_* según el filtro
+        TipoDato tipo;
+        switch (filtroId) {
+            case 1:  tipo = TipoDato.LISTA_TEXTO;   break;
+            case 3:  tipo = TipoDato.LISTA_IMAGEN;  break;
+            case 4:  tipo = TipoDato.LISTA_BINARIO; break;
+            case 5:  tipo = TipoDato.LISTA_BASE64;  break;
+            default: tipo = TipoDato.LISTA_TEXTO;   break;
+        }
+
+        System.err.println("   Tipo inferido: " + tipo + " (" + lista.size() + " archivo(s))\n");
+        return new PaqueteDatos(tipo, lista, nombres);
     }
 
     /**
